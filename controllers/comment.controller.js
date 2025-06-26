@@ -1,4 +1,4 @@
-import Comment from "../models/Comment.model.js";
+import Comment from "../models/comment.model.js";
 import User from "../models/user.model.js";
 
 export const getPostComments = async (req, res) => {
@@ -53,7 +53,9 @@ export const deleteComment = async (req, res) => {
   });
 
   if (!deletedComment) {
-    return res.status(403).json("Vous ne pouvez supprimer que vos propres commentaires!");
+    return res
+      .status(403)
+      .json("Vous ne pouvez supprimer que vos propres commentaires!");
   }
 
   res.status(200).json("Commentaire supprimé");

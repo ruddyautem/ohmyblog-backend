@@ -8,7 +8,7 @@ import { clerkMiddleware } from "@clerk/express";
 import cors from "cors";
 
 const app = express();
-const port = 3000;
+const port = 4000;
 
 app.use(
   cors({
@@ -40,6 +40,6 @@ app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
 });
 
-// ngrok http --url=bengal-learning-internally.ngrok-free.app 3000
+// ngrok http --url=bengal-learning-internally.ngrok-free.app 4000
 
 // node --env-file .env --watch index.js
