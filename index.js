@@ -1,5 +1,5 @@
 import express from "express";
-import compression from 'compression';  // 👈 ADD THIS
+import compression from "compression";
 import userRouter from "./routes/user.route.js";
 import postRouter from "./routes/post.route.js";
 import commentRouter from "./routes/comment.route.js";
@@ -19,15 +19,15 @@ app.use(
   })
 );
 
-// 👇 ADD THESE
 app.use(compression());
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-// 👇 UPDATE THIS
-app.use(clerkMiddleware({
-  debug: process.env.NODE_ENV !== 'production'
-}));
+app.use(
+  clerkMiddleware({
+    debug: process.env.NODE_ENV !== "production",
+  })
+);
 
 app.use("/webhooks", webhookRouter);
 app.use("/users", userRouter);
@@ -43,12 +43,19 @@ app.use((error, req, res, next) => {
   });
 });
 
-// 👇 CONNECT DB BEFORE STARTING SERVER
-await connectDB();
+// 👇 WRAP IN ASYNC FUNCTION (fixes PM2 crash)
+(async () => {
+  try {
+    await connectDB();
 
-app.listen(port, () => {
-  console.log(`✅ Server: http://localhost:${port}`);
-});
+    app.listen(port, () => {
+      console.log(`✅ Server: http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error("❌ Startup failed:", error);
+    process.exit(1);
+  }
+})();
 
 // ngrok http --url=bengal-learning-internally.ngrok-free.app 4000
 
