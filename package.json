@@ -12,7 +12,6 @@
   "dependencies": {
     "@clerk/express": "^1.7.55",
     "body-parser": "^2.2.1",
-    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "express": "^5.2.1",
     "imagekit": "^6.0.0",
