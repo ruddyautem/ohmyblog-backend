@@ -4,7 +4,9 @@ import User from "../models/user.model.js";
 export const getPostComments = async (req, res) => {
   const comments = await Comment.find({ post: req.params.postId })
     .populate("user", "username img")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
 
   res.json(comments);
 };
@@ -17,7 +19,7 @@ export const addComment = async (req, res) => {
     return res.status(401).json("Pas authentifié!");
   }
 
-  const user = await User.findOne({ clerkUserId });
+  const user = await User.findOne({ clerkUserId }).lean();
 
   const newComment = new Comment({
     ...req.body,
@@ -45,7 +47,7 @@ export const deleteComment = async (req, res) => {
     return res.status(200).json("Commentaire supprimé");
   }
 
-  const user = await User.findOne({ clerkUserId });
+  const user = await User.findOne({ clerkUserId }).lean();
 
   const deletedComment = await Comment.findOneAndDelete({
     _id: id,

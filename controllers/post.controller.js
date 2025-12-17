@@ -25,7 +25,7 @@ export const getPosts = async (req, res) => {
   }
 
   if (author) {
-    const user = await User.findOne({ username: author }).select("_id");
+    const user = await User.findOne({ username: author }).select("_id").lean();
 
     if (!user) {
       return res.status(404).json("Aucun post trouvé");
@@ -48,10 +48,11 @@ export const getPosts = async (req, res) => {
         sortObj = { visit: -1 };
         break;
       case "trending":
-        sortObj = { visit: 1 };
-        $gte: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000);
+        sortObj = { visit: -1 };
+        query.createdAt = {
+          $gte: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000),
+        };
         break;
-        query.createdAt = {};
     }
   }
 
@@ -63,27 +64,30 @@ export const getPosts = async (req, res) => {
     .populate("user", "username")
     .sort(sortObj)
     .limit(limit)
-    .skip((page - 1) * limit);
+    .skip((page - 1) * limit)
+    .lean();
 
-  const totalPosts = await Post.countDocuments();
+  const totalPosts = await Post.countDocuments(query);
   const hasMore = page * limit < totalPosts;
 
   res.status(200).json({ posts, hasMore });
 };
+
 export const getPost = async (req, res) => {
-  const post = await Post.findOne({ slug: req.params.slug }).populate(
-    "user",
-    "username img"
-  );
+  const post = await Post.findOne({ slug: req.params.slug })
+    .populate("user", "username img")
+    .lean();
+  
   res.status(200).json(post);
 };
+
 export const createPost = async (req, res) => {
   const clerkUserId = req.auth.userId;
   if (!clerkUserId) {
     return res.status(401).json({ message: "Not Authenticated" });
   }
 
-  const user = await User.findOne({ clerkUserId });
+  const user = await User.findOne({ clerkUserId }).lean();
 
   if (!user) {
     return res.status(404).json({ message: "User not found" });
@@ -91,13 +95,13 @@ export const createPost = async (req, res) => {
 
   let slug = req.body.title.replace(/ /g, "-").toLowerCase();
 
-  let existingPost = await Post.findOne({ slug });
+  let existingPost = await Post.findOne({ slug }).lean();
 
   let counter = 2;
 
   while (existingPost) {
     slug = `${slug}-${counter}`;
-    existingPost = await Post.findOne({ slug });
+    existingPost = await Post.findOne({ slug }).lean();
     counter++;
   }
 
@@ -119,12 +123,13 @@ export const deletePost = async (req, res) => {
     return res.status(200).json("Post supprimé");
   }
 
-  const user = await User.findOne({ clerkUserId });
+  const user = await User.findOne({ clerkUserId }).lean();
 
-  const deletedPost = await Post.findByIdAndDelete({
+  const deletedPost = await Post.findOneAndDelete({
     _id: req.params.id,
     user: user._id,
   });
+
   if (!deletedPost) {
     return res
       .status(403)
@@ -132,6 +137,7 @@ export const deletePost = async (req, res) => {
   }
   res.status(200).json("Post supprimé");
 };
+
 export const featurePost = async (req, res) => {
   const clerkUserId = req.auth.userId;
   const postId = req.body.postId;
@@ -148,10 +154,10 @@ export const featurePost = async (req, res) => {
       .json("Vous ne pouvez pas mettre un poste en vedette");
   }
 
-  const post = await Post.findById(postId);
+  const post = await Post.findById(postId).lean();
 
   if (!post) {
-    return res.status(404).json(updatedPost);
+    return res.status(404).json("Post non trouvé");
   }
 
   const isFeatured = post.isFeatured;
@@ -162,7 +168,7 @@ export const featurePost = async (req, res) => {
     { new: true }
   );
 
-  res.status(200).json("Post supprimé");
+  res.status(200).json(updatedPost);
 };
 
 const imagekit = new ImageKit({
