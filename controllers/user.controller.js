@@ -1,37 +1,57 @@
 import User from "../models/user.model.js";
 
 export const getUserSavedPosts = async (req, res) => {
-  const clerkUserId = req.auth.userId;
+  const auth = req.auth();
+  const clerkUserId = auth.userId;
 
   if (!clerkUserId) {
-    return res.status(401).json("Not Authenticated!");
+    return res.status(401).json([]);
   }
 
-  const user = await User.findOne({ clerkUserId }).select("savedPosts").lean();
-
-  res.status(200).json(user.savedPosts);
+  try {
+    const user = await User.findOne({ clerkUserId })
+      .select("savedPosts")
+      .lean();
+    res.status(200).json(user?.savedPosts || []);
+  } catch (error) {
+    console.error("Error fetching saved posts:", error);
+    res.status(500).json([]);
+  }
 };
 
 export const savePost = async (req, res) => {
-  const clerkUserId = req.auth.userId;
+  const auth = req.auth();
+  const clerkUserId = auth.userId;
   const postId = req.body.postId;
 
   if (!clerkUserId) {
-    return res.status(401).json("Not Authenticated!");
+    return res.status(401).json({ error: "Not Authenticated!" });
   }
 
-  const user = await User.findOne({ clerkUserId });
+  try {
+    const user = await User.findOne({ clerkUserId })
+      .select("_id savedPosts")
+      .lean();
 
-  const isSaved = user.savedPosts.some((p) => p.toString() === postId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-  if (!isSaved) {
-    await User.findByIdAndUpdate(user._id, {
-      $push: { savedPosts: postId },
-    });
-  } else {
-    await User.findByIdAndUpdate(user._id, {
-      $pull: { savedPosts: postId },
-    });
+    const isSaved = user.savedPosts.some((p) => p.toString() === postId);
+
+    if (!isSaved) {
+      await User.findByIdAndUpdate(user._id, {
+        $push: { savedPosts: postId },
+      });
+    } else {
+      await User.findByIdAndUpdate(user._id, {
+        $pull: { savedPosts: postId },
+      });
+    }
+
+    res.status(200).json({ message: isSaved ? "Post Unsaved" : "Post Saved" });
+  } catch (error) {
+    console.error("Error saving/unsaving post:", error);
+    res.status(500).json({ error: "Failed to save post" });
   }
-  res.status(200).json(isSaved ? "Post Unsaved" : "Post Saved");
 };

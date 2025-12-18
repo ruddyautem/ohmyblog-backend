@@ -8,8 +8,6 @@ export const getPosts = async (req, res) => {
 
   const query = {};
 
-  console.log(req.query);
-
   const cat = req.query.cat;
   const author = req.query.author;
   const searchQuery = req.query.search;
@@ -28,7 +26,7 @@ export const getPosts = async (req, res) => {
     const user = await User.findOne({ username: author }).select("_id").lean();
 
     if (!user) {
-      return res.status(404).json("Aucun post trouvé");
+      return res.status(404).json({ posts: [], hasMore: false });
     }
 
     query.user = user._id;
@@ -50,7 +48,7 @@ export const getPosts = async (req, res) => {
       case "trending":
         sortObj = { visit: -1 };
         query.createdAt = {
-          $gte: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000),
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
         };
         break;
     }
@@ -60,115 +58,157 @@ export const getPosts = async (req, res) => {
     query.isFeatured = true;
   }
 
-  const posts = await Post.find(query)
-    .populate("user", "username")
-    .sort(sortObj)
-    .limit(limit)
-    .skip((page - 1) * limit)
-    .lean();
+  try {
+    const posts = await Post.find(query)
+      .populate("user", "username")
+      .sort(sortObj)
+      .limit(limit)
+      .skip((page - 1) * limit)
+      .select("-content -__v")
+      .lean();
 
-  const totalPosts = await Post.countDocuments(query);
-  const hasMore = page * limit < totalPosts;
+    const totalPosts = await Post.countDocuments(query);
+    const hasMore = page * limit < totalPosts;
 
-  res.status(200).json({ posts, hasMore });
+    res.status(200).json({ posts, hasMore });
+  } catch (error) {
+    console.error("Error fetching posts:", error);
+    res.status(500).json({ posts: [], hasMore: false });
+  }
 };
 
 export const getPost = async (req, res) => {
-  const post = await Post.findOne({ slug: req.params.slug })
-    .populate("user", "username img")
-    .lean();
-  
-  res.status(200).json(post);
+  try {
+    const post = await Post.findOneAndUpdate(
+      { slug: req.params.slug },
+      { $inc: { visit: 1 } },
+      { new: true }
+    )
+      .populate("user", "username img")
+      .select("-__v")
+      .lean();
+
+    if (!post) {
+      return res.status(404).json({ error: "Post non trouvé" });
+    }
+
+    res.status(200).json(post);
+  } catch (error) {
+    console.error("Error fetching post:", error);
+    res.status(500).json({ error: "Failed to fetch post" });
+  }
 };
 
 export const createPost = async (req, res) => {
-  const clerkUserId = req.auth.userId;
+  const auth = req.auth();
+  const clerkUserId = auth.userId;
+
   if (!clerkUserId) {
-    return res.status(401).json({ message: "Not Authenticated" });
+    return res.status(401).json({ error: "Not Authenticated" });
   }
 
-  const user = await User.findOne({ clerkUserId }).lean();
+  try {
+    const user = await User.findOne({ clerkUserId }).select("_id").lean();
 
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    let slug = req.body.title.replace(/ /g, "-").toLowerCase();
+    let existingPost = await Post.findOne({ slug }).select("_id").lean();
+
+    let counter = 2;
+    while (existingPost) {
+      slug = `${slug}-${counter}`;
+      existingPost = await Post.findOne({ slug }).select("_id").lean();
+      counter++;
+    }
+
+    const newPost = new Post({ user: user._id, slug, ...req.body });
+    const post = await newPost.save();
+
+    res.status(200).json(post.toObject());
+  } catch (error) {
+    console.error("Error creating post:", error);
+    res.status(500).json({ error: "Failed to create post" });
   }
-
-  let slug = req.body.title.replace(/ /g, "-").toLowerCase();
-
-  let existingPost = await Post.findOne({ slug }).lean();
-
-  let counter = 2;
-
-  while (existingPost) {
-    slug = `${slug}-${counter}`;
-    existingPost = await Post.findOne({ slug }).lean();
-    counter++;
-  }
-
-  const newPost = new Post({ user: user._id, slug, ...req.body });
-  const post = await newPost.save();
-  res.status(200).json(post);
 };
 
 export const deletePost = async (req, res) => {
-  const clerkUserId = req.auth.userId;
+  const auth = req.auth();
+  const clerkUserId = auth.userId;
+
   if (!clerkUserId) {
-    return res.status(401).json({ message: "Pas authentifié!" });
+    return res.status(401).json({ error: "Pas authentifié!" });
   }
 
-  const role = req.auth.sessionClaims?.metadata?.role || "user";
+  const role = auth.sessionClaims?.metadata?.role || "user";
 
   if (role === "admin") {
     await Post.findByIdAndDelete(req.params.id);
-    return res.status(200).json("Post supprimé");
+    return res.status(200).json({ message: "Post supprimé" });
   }
 
-  const user = await User.findOne({ clerkUserId }).lean();
+  try {
+    const user = await User.findOne({ clerkUserId }).select("_id").lean();
 
-  const deletedPost = await Post.findOneAndDelete({
-    _id: req.params.id,
-    user: user._id,
-  });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-  if (!deletedPost) {
-    return res
-      .status(403)
-      .json("Vous ne pouvez supprimer que vos propres posts!");
+    const deletedPost = await Post.findOneAndDelete({
+      _id: req.params.id,
+      user: user._id,
+    }).lean();
+
+    if (!deletedPost) {
+      return res
+        .status(403)
+        .json({ error: "Vous ne pouvez supprimer que vos propres posts!" });
+    }
+
+    res.status(200).json({ message: "Post supprimé" });
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    res.status(500).json({ error: "Failed to delete post" });
   }
-  res.status(200).json("Post supprimé");
 };
 
 export const featurePost = async (req, res) => {
-  const clerkUserId = req.auth.userId;
+  const auth = req.auth();
+  const clerkUserId = auth.userId;
   const postId = req.body.postId;
 
   if (!clerkUserId) {
-    return res.status(401).json({ message: "Pas authentifié!" });
+    return res.status(401).json({ error: "Pas authentifié!" });
   }
 
-  const role = req.auth.sessionClaims?.metadata?.role || "user";
+  const role = auth.sessionClaims?.metadata?.role || "user";
 
   if (role !== "admin") {
     return res
       .status(403)
-      .json("Vous ne pouvez pas mettre un poste en vedette");
+      .json({ error: "Vous ne pouvez pas mettre un poste en vedette" });
   }
 
-  const post = await Post.findById(postId).lean();
+  try {
+    const post = await Post.findById(postId).select("isFeatured").lean();
 
-  if (!post) {
-    return res.status(404).json("Post non trouvé");
+    if (!post) {
+      return res.status(404).json({ error: "Post non trouvé" });
+    }
+
+    const updatedPost = await Post.findByIdAndUpdate(
+      postId,
+      { isFeatured: !post.isFeatured },
+      { new: true, select: "isFeatured title slug" }
+    ).lean();
+
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error("Error featuring post:", error);
+    res.status(500).json({ error: "Failed to feature post" });
   }
-
-  const isFeatured = post.isFeatured;
-
-  const updatedPost = await Post.findByIdAndUpdate(
-    postId,
-    { isFeatured: !isFeatured },
-    { new: true }
-  );
-
-  res.status(200).json(updatedPost);
 };
 
 const imagekit = new ImageKit({
