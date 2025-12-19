@@ -42,12 +42,25 @@ app.use((error, req, res, next) => {
   });
 });
 
+// ✅ FIX: Use .once() instead of .on()
 const gracefulShutdown = async (signal) => {
   console.log(`\n⚠️ ${signal} received, closing gracefully...`);
 
   try {
+    // Close server first
+    if (server) {
+      server.close(() => {
+        console.log("✅ HTTP server closed");
+      });
+    }
+
+    // Then close MongoDB
     await mongoose.connection.close(false);
     console.log("✅ MongoDB connection closed");
+
+    // ✅ FIX: Remove all listeners before exit
+    process.removeAllListeners();
+
     process.exit(0);
   } catch (err) {
     console.error("❌ Error during shutdown:", err);
@@ -55,27 +68,44 @@ const gracefulShutdown = async (signal) => {
   }
 };
 
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+// ✅ FIX: Use .once() to prevent listener accumulation
+process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.once("SIGINT", () => gracefulShutdown("SIGINT"));
 
+// ✅ FIX: Memory debug only if explicitly enabled
+let memoryInterval;
 if (process.env.MEMORY_DEBUG === "true") {
-  setInterval(() => {
+  memoryInterval = setInterval(() => {
     const used = process.memoryUsage();
     console.log(
       `📊 Memory: ${Math.round(used.heapUsed / 1024 / 1024)} MB / ${Math.round(
         used.heapTotal / 1024 / 1024
-      )} MB`
+      )} MB (RSS: ${Math.round(used.rss / 1024 / 1024)} MB)`
     );
   }, 60000);
+
+  // ✅ FIX: Clean up interval on shutdown
+  process.once("beforeExit", () => {
+    if (memoryInterval) clearInterval(memoryInterval);
+  });
 }
+
+// ✅ FIX: Store server instance for graceful shutdown
+let server;
 
 (async () => {
   try {
     await connectDB();
 
-    app.listen(port, () => {
+    server = app.listen(port, () => {
       console.log(`✅ Server: http://localhost:${port}`);
-      console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`📝 Environment: ${process.env.NODE_ENV || "production"}`);
+    });
+
+    // ✅ FIX: Handle server errors
+    server.on("error", (err) => {
+      console.error("❌ Server error:", err);
+      process.exit(1);
     });
   } catch (error) {
     console.error("❌ Startup failed:", error);

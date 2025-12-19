@@ -2,11 +2,11 @@ import { Webhook } from "svix";
 import User from "../models/user.model.js";
 
 export const clerkWebHook = async (req, res) => {
-  console.log("Webhook received:", req.body.type);
+  // ✅ REMOVED: console.log("Webhook received:", req.body.type);
   
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
   if (!WEBHOOK_SECRET) {
-    console.error("Missing CLERK_WEBHOOK_SECRET env variable");
+    console.error("Missing CLERK_WEBHOOK_SECRET");
     return res.status(500).json({ message: "Webhook secret is missing" });
   }
 
@@ -32,12 +32,12 @@ export const clerkWebHook = async (req, res) => {
   try {
     evt = wh.verify(JSON.stringify(payload), headers);
   } catch (err) {
-    console.error("Webhook verification failed:", err);
+    console.error("Webhook verification failed");
     return res.status(400).json({ message: "Webhook signature verification failed" });
   }
 
   const eventType = evt.type;
-  console.log("Verified webhook event:", eventType);
+  // ✅ REMOVED: console.log("Verified webhook event:", eventType);
 
   try {
     if (eventType === "user.created") {
@@ -51,12 +51,13 @@ export const clerkWebHook = async (req, res) => {
       });
 
       await newUser.save();
-      console.log("New user created:", newUser._id);
+      // ✅ REMOVED: console.log("New user created:", newUser._id);
     }
 
     return res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
-    console.error("Error processing webhook:", error);
+    // ✅ CHANGED: Only log error message, not full object
+    console.error("Webhook processing error:", error.message);
     return res.status(500).json({ message: "Error processing webhook", error: error.message });
   }
 };
