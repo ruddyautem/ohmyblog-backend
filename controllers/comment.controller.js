@@ -12,7 +12,6 @@ export const getPostComments = async (req, res) => {
 
     res.json(comments || []);
   } catch (error) {
-    console.error("Error fetching comments:", error);
     res.status(500).json([]);
   }
 };
@@ -47,7 +46,6 @@ export const addComment = async (req, res) => {
 
     res.status(201).json(populatedComment);
   } catch (error) {
-    console.error("Error adding comment:", error);
     res.status(500).json({ error: "Failed to add comment" });
   }
 };
@@ -88,7 +86,6 @@ export const deleteComment = async (req, res) => {
 
     res.status(200).json({ message: "Commentaire supprimé" });
   } catch (error) {
-    console.error("Error deleting comment:", error);
     res.status(500).json({ error: "Failed to delete comment" });
   }
 };

@@ -42,37 +42,30 @@ app.use((error, req, res, next) => {
   });
 });
 
-// ✅ FIX: Use .once() instead of .on()
 const gracefulShutdown = async (signal) => {
   console.log(`\n⚠️ ${signal} received, closing gracefully...`);
 
   try {
-    // Close server first
     if (server) {
       server.close(() => {
         console.log("✅ HTTP server closed");
       });
     }
 
-    // Then close MongoDB
     await mongoose.connection.close(false);
     console.log("✅ MongoDB connection closed");
 
-    // ✅ FIX: Remove all listeners before exit
     process.removeAllListeners();
-
     process.exit(0);
   } catch (err) {
-    console.error("❌ Error during shutdown:", err);
+    console.error("❌ Error during shutdown:", err.message);
     process.exit(1);
   }
 };
 
-// ✅ FIX: Use .once() to prevent listener accumulation
 process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.once("SIGINT", () => gracefulShutdown("SIGINT"));
 
-// ✅ FIX: Memory debug only if explicitly enabled
 let memoryInterval;
 if (process.env.MEMORY_DEBUG === "true") {
   memoryInterval = setInterval(() => {
@@ -84,13 +77,11 @@ if (process.env.MEMORY_DEBUG === "true") {
     );
   }, 60000);
 
-  // ✅ FIX: Clean up interval on shutdown
   process.once("beforeExit", () => {
     if (memoryInterval) clearInterval(memoryInterval);
   });
 }
 
-// ✅ FIX: Store server instance for graceful shutdown
 let server;
 
 (async () => {
@@ -102,13 +93,12 @@ let server;
       console.log(`📝 Environment: ${process.env.NODE_ENV || "production"}`);
     });
 
-    // ✅ FIX: Handle server errors
-    server.on("error", (err) => {
-      console.error("❌ Server error:", err);
+    server.once("error", (err) => {
+      console.error("❌ Server error:", err.message);
       process.exit(1);
     });
   } catch (error) {
-    console.error("❌ Startup failed:", error);
+    console.error("❌ Startup failed:", error.message);
     process.exit(1);
   }
 })();
