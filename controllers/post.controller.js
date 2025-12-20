@@ -72,7 +72,7 @@ export const getPosts = async (req, res) => {
 
     res.status(200).json({ posts, hasMore });
   } catch (error) {
-    console.error("Error fetching posts:", error);
+    // ✅ REMOVED: console.error - keeps Error objects in memory
     res.status(500).json({ posts: [], hasMore: false });
   }
 };
@@ -94,7 +94,7 @@ export const getPost = async (req, res) => {
 
     res.status(200).json(post);
   } catch (error) {
-    console.error("Error fetching post:", error);
+    // ✅ REMOVED: console.error
     res.status(500).json({ error: "Failed to fetch post" });
   }
 };
@@ -129,7 +129,7 @@ export const createPost = async (req, res) => {
 
     res.status(200).json(post.toObject());
   } catch (error) {
-    console.error("Error creating post:", error);
+    // ✅ REMOVED: console.error
     res.status(500).json({ error: "Failed to create post" });
   }
 };
@@ -169,7 +169,7 @@ export const deletePost = async (req, res) => {
 
     res.status(200).json({ message: "Post supprimé" });
   } catch (error) {
-    console.error("Error deleting post:", error);
+    // ✅ REMOVED: console.error
     res.status(500).json({ error: "Failed to delete post" });
   }
 };
@@ -206,7 +206,7 @@ export const featurePost = async (req, res) => {
 
     res.status(200).json(updatedPost);
   } catch (error) {
-    console.error("Error featuring post:", error);
+    // ✅ REMOVED: console.error
     res.status(500).json({ error: "Failed to feature post" });
   }
 };
