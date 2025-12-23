@@ -72,7 +72,6 @@ export const getPosts = async (req, res) => {
 
     res.status(200).json({ posts, hasMore });
   } catch (error) {
-    // ✅ REMOVED: console.error - keeps Error objects in memory
     res.status(500).json({ posts: [], hasMore: false });
   }
 };
@@ -94,7 +93,6 @@ export const getPost = async (req, res) => {
 
     res.status(200).json(post);
   } catch (error) {
-    // ✅ REMOVED: console.error
     res.status(500).json({ error: "Failed to fetch post" });
   }
 };
@@ -114,7 +112,10 @@ export const createPost = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    let slug = req.body.title.replace(/ /g, "-").toLowerCase();
+    // ✅ Destructure only what we need from req.body
+    const { title, desc, category, content, img } = req.body;
+
+    let slug = title.replace(/ /g, "-").toLowerCase();
     let existingPost = await Post.findOne({ slug }).select("_id").lean();
 
     let counter = 2;
@@ -124,12 +125,25 @@ export const createPost = async (req, res) => {
       counter++;
     }
 
-    const newPost = new Post({ user: user._id, slug, ...req.body });
-    const post = await newPost.save();
+    const newPost = new Post({
+      user: user._id,
+      slug,
+      title,
+      desc,
+      category,
+      content,
+      img,
+    });
 
-    res.status(200).json(post.toObject());
+    const savedPost = await newPost.save();
+
+    // ✅ Return only essential fields
+    res.status(200).json({
+      _id: savedPost._id,
+      slug: savedPost.slug,
+      title: savedPost.title,
+    });
   } catch (error) {
-    // ✅ REMOVED: console.error
     res.status(500).json({ error: "Failed to create post" });
   }
 };
@@ -169,7 +183,6 @@ export const deletePost = async (req, res) => {
 
     res.status(200).json({ message: "Post supprimé" });
   } catch (error) {
-    // ✅ REMOVED: console.error
     res.status(500).json({ error: "Failed to delete post" });
   }
 };
@@ -206,7 +219,6 @@ export const featurePost = async (req, res) => {
 
     res.status(200).json(updatedPost);
   } catch (error) {
-    // ✅ REMOVED: console.error
     res.status(500).json({ error: "Failed to feature post" });
   }
 };

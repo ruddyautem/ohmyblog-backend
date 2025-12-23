@@ -32,8 +32,11 @@ export const addComment = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // ✅ Destructure only what we need from req.body
+    const { desc } = req.body;
+
     const newComment = new Comment({
-      ...req.body,
+      desc,
       user: user._id,
       post: postId,
     });

@@ -23,12 +23,14 @@ export const clerkWebHook = async (req, res) => {
   };
 
   const wh = new Webhook(WEBHOOK_SECRET);
-  
+
   let evt;
   try {
     evt = wh.verify(JSON.stringify(payload), headers);
   } catch (err) {
-    return res.status(400).json({ message: "Webhook signature verification failed" });
+    return res
+      .status(400)
+      .json({ message: "Webhook signature verification failed" });
   }
 
   const eventType = evt.type;
@@ -36,11 +38,17 @@ export const clerkWebHook = async (req, res) => {
   try {
     if (eventType === "user.created") {
       const userData = evt.data;
-      
+
       const newUser = new User({
         clerkUserId: userData.id,
-        username: userData.username || (userData.email_addresses && userData.email_addresses[0]?.email_address) || `user_${userData.id}`,
-        email: userData.email_addresses && userData.email_addresses[0]?.email_address,
+        username:
+          userData.username ||
+          (userData.email_addresses &&
+            userData.email_addresses[0]?.email_address) ||
+          `user_${userData.id}`,
+        email:
+          userData.email_addresses &&
+          userData.email_addresses[0]?.email_address,
         img: userData.image_url,
       });
 
