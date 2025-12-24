@@ -2,6 +2,20 @@ import Post from "../models/post.model.js";
 import User from "../models/user.model.js";
 import ImageKit from "imagekit";
 
+// ✅ CHANGE: Lazy-load ImageKit instance (singleton pattern)
+let imagekitInstance = null;
+
+const getImageKit = () => {
+  if (!imagekitInstance) {
+    imagekitInstance = new ImageKit({
+      urlEndpoint: process.env.IK_URL_ENDPOINT,
+      publicKey: process.env.IK_PUBLIC_KEY,
+      privateKey: process.env.IK_PRIVATE_KEY,
+    });
+  }
+  return imagekitInstance;
+};
+
 export const getPosts = async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 2;
@@ -112,7 +126,6 @@ export const createPost = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // ✅ Destructure only what we need from req.body
     const { title, desc, category, content, img } = req.body;
 
     let slug = title.replace(/ /g, "-").toLowerCase();
@@ -137,7 +150,6 @@ export const createPost = async (req, res) => {
 
     const savedPost = await newPost.save();
 
-    // ✅ Return only essential fields
     res.status(200).json({
       _id: savedPost._id,
       slug: savedPost.slug,
@@ -223,13 +235,8 @@ export const featurePost = async (req, res) => {
   }
 };
 
-const imagekit = new ImageKit({
-  urlEndpoint: process.env.IK_URL_ENDPOINT,
-  publicKey: process.env.IK_PUBLIC_KEY,
-  privateKey: process.env.IK_PRIVATE_KEY,
-});
-
+// ✅ CHANGE: Use lazy-loaded ImageKit instance
 export const uploadAuth = async (req, res) => {
-  const result = imagekit.getAuthenticationParameters();
+  const result = getImageKit().getAuthenticationParameters();
   res.send(result);
 };
