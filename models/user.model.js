@@ -21,7 +21,8 @@ const userSchema = new Schema(
       type: String,
     },
     savedPosts: {
-      type: [String],
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Post",
       default: [],
     },
   },

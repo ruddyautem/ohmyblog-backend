@@ -17,8 +17,8 @@ const getImageKit = () => {
 };
 
 export const getPosts = async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 2;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(20, parseInt(req.query.limit) || 10);
 
   const query = {};
 
@@ -38,11 +38,9 @@ export const getPosts = async (req, res) => {
 
   if (author) {
     const user = await User.findOne({ username: author }).select("_id").lean();
-
     if (!user) {
       return res.status(404).json({ posts: [], hasMore: false });
     }
-
     query.user = user._id;
   }
 
@@ -73,15 +71,18 @@ export const getPosts = async (req, res) => {
   }
 
   try {
-    const posts = await Post.find(query)
-      .populate("user", "username")
-      .sort(sortObj)
-      .limit(limit)
-      .skip((page - 1) * limit)
-      .select("-content -__v")
-      .lean();
+    // ✅ Run query and count in parallel
+    const [posts, totalPosts] = await Promise.all([
+      Post.find(query)
+        .populate("user", "username")
+        .sort(sortObj)
+        .limit(limit)
+        .skip((page - 1) * limit)
+        .select("-content -__v")
+        .lean(),
+      Post.countDocuments(query)
+    ]);
 
-    const totalPosts = await Post.countDocuments(query);
     const hasMore = page * limit < totalPosts;
 
     res.status(200).json({ posts, hasMore });
@@ -92,11 +93,7 @@ export const getPosts = async (req, res) => {
 
 export const getPost = async (req, res) => {
   try {
-    const post = await Post.findOneAndUpdate(
-      { slug: req.params.slug },
-      { $inc: { visit: 1 } },
-      { new: true }
-    )
+    const post = await Post.findOne({ slug: req.params.slug })
       .populate("user", "username img")
       .select("-__v")
       .lean();
@@ -104,6 +101,9 @@ export const getPost = async (req, res) => {
     if (!post) {
       return res.status(404).json({ error: "Post non trouvé" });
     }
+
+    // ✅ Background task: Don't wait for the visit increment
+    Post.updateOne({ _id: post._id }, { $inc: { visit: 1 } }).exec();
 
     res.status(200).json(post);
   } catch (error) {
